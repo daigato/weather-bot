@@ -1,34 +1,58 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "./lib/supabase";
 
 export default function Home() {
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [latitude, setLatitude] = useState<string | null>(null);
   const [longitude, setLongitude] = useState<string | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
-  const [character, setCharacter] = useState("オカン風");
+  const [character, setCharacter] = useState("オカン");
   const [morningTime, setMorningTime] = useState("07:00");
   const [noonTime, setNoonTime] = useState("12:00");
   const [nightTime, setNightTime] = useState("19:00");
+  const [isLoading, setIsLoading] = useState(true);
 
-  // 🔄 画面が開いたときに読み込む
+  const router = useRouter();
+  const supabase = createClient();
+
+  // 🔄 画面が開いたときに認証状態を確認し、設定を読み込む
   useEffect(() => {
-    const savedAddress = localStorage.getItem("bot_address");
-    const savedLat = localStorage.getItem("bot_latitude");
-    const savedLon = localStorage.getItem("bot_longitude");
-    const savedCharacter = localStorage.getItem("bot_character");
-    const savedMorning = localStorage.getItem("bot_morningTime");
-    const savedNoon = localStorage.getItem("bot_noonTime");
-    const savedNight = localStorage.getItem("bot_nightTime");
+    const init = async () => {
+      // 1. ログイン中のユーザーを取得
+      const { data: { user } } = await supabase.auth.getUser();
 
-    if (savedAddress) setAddress(savedAddress);
-    if (savedLat) setLatitude(savedLat);
-    if (savedLon) setLongitude(savedLon);
-    if (savedCharacter) setCharacter(savedCharacter);
-    if (savedMorning) setMorningTime(savedMorning);
-    if (savedNoon) setNoonTime(savedNoon);
-    if (savedNight) setNightTime(savedNight);
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+
+      setUserId(user.id);
+      setUserEmail(user.email || null);
+
+      // 2. サーバーから設定を取得
+      try {
+        const response = await fetch("/api/settings");
+        if (response.ok) {
+          const data = await response.json();
+          if (data.city) setAddress(data.city);
+          if (data.character) setCharacter(data.character);
+          if (data.notificationTime && data.notificationTime !== "off") {
+            setMorningTime(data.notificationTime);
+          }
+        }
+      } catch (error) {
+        console.error("サーバー設定の同期に失敗しました:", error);
+      }
+
+      setIsLoading(false);
+    };
+
+    init();
   }, []);
 
   const handleGetLocation = () => {
@@ -77,32 +101,43 @@ export default function Home() {
     );
   };
 
-  // 💾 データをブラウザとサーバーに保存する処理（地名クレンジング機能付き！）
+  // 💾 データをサーバーに保存する処理
   const handleSave = async () => {
-    localStorage.setItem("bot_address", address || "");
-    localStorage.setItem("bot_latitude", latitude || "");
-    localStorage.setItem("bot_longitude", longitude || "");
-    localStorage.setItem("bot_character", character);
-    localStorage.setItem("bot_morningTime", morningTime);
-    localStorage.setItem("bot_noonTime", noonTime);
-    localStorage.setItem("bot_nightTime", nightTime);
+    if (!userId) return;
 
-    if (address) {
-      const cleanCity = address.replace(/[市区町村]/g, "");
+    const cleanCity = address ? address.replace(/[市区町村]/g, "") : "";
 
-      try {
-        await fetch("/api/settings", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ city: cleanCity }),
-        });
-      } catch (error) {
-        console.error("サーバーへの保存に失敗しました:", error);
-      }
+    try {
+      await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          city: cleanCity || undefined,
+          character: character,
+          notificationTime: morningTime,
+        }),
+      });
+      alert("設定を保存しました！");
+    } catch (error) {
+      console.error("サーバーへの保存に失敗しました:", error);
+      alert("保存に失敗しました。もう一度お試しください。");
     }
-
-    alert("設定を保存し、LINEボットと同期しました！");
   };
+
+  // 🚪 ログアウト処理
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  };
+
+  if (isLoading) {
+    return (
+      <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#fff8e7_0%,_#f8fafc_38%,_#e2e8f0_100%)] flex items-center justify-center">
+        <div className="text-slate-500 text-sm">読み込み中...</div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#fff8e7_0%,_#f8fafc_38%,_#e2e8f0_100%)] px-4 py-6 text-slate-900 sm:px-6 sm:py-10 lg:px-8">
@@ -113,9 +148,18 @@ export default function Home() {
           <div className="relative flex flex-col justify-between overflow-hidden rounded-[1.75rem] bg-slate-950 p-6 text-white shadow-2xl shadow-slate-950/20 sm:p-8">
             <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(251,191,36,0.18),rgba(56,189,248,0.12),transparent_70%)]" />
             <div className="relative space-y-4 sm:space-y-6">
-              <span className="inline-flex w-fit rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-amber-200 sm:text-sm">
-                Weather Line Bot Settings
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="inline-flex w-fit rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-amber-200 sm:text-sm">
+                  Weather Line Bot Settings
+                </span>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-slate-300 transition hover:bg-white/20 hover:text-white sm:text-sm"
+                >
+                  ログアウト
+                </button>
+              </div>
               <div className="space-y-3">
                 <h1 className="max-w-md text-3xl font-semibold tracking-tight sm:text-5xl">
                   AIお天気LINEボット 設定
@@ -123,6 +167,22 @@ export default function Home() {
                 <p className="max-w-md text-xs leading-6 text-slate-300 sm:text-base">
                   位置情報、キャラクター、通知時間を調整して、あなたにぴったりな配信タイミングと言葉遣いを選べます。
                 </p>
+                {userEmail && (
+                  <p className="text-xs text-slate-400">
+                    ログイン中: {userEmail}
+                  </p>
+                )}
+                
+                {/* 連携コード表示 */}
+                <div className="mt-4 rounded-xl border border-amber-200/30 bg-amber-500/10 p-4">
+                  <p className="text-xs font-semibold text-amber-200">📱 LINEボットと連携する</p>
+                  <p className="mt-1 text-xs text-slate-300">
+                    LINEボットのトーク画面で、以下のテキストをコピーして送信してください。
+                  </p>
+                  <div className="mt-2 flex items-center justify-between rounded-lg bg-slate-900 px-3 py-2">
+                    <code className="text-xs text-amber-400 select-all">連携：{userId}</code>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -193,10 +253,10 @@ export default function Home() {
                   onChange={(event) => setCharacter(event.target.value)}
                   className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-2.5 pr-11 text-xs text-slate-900 outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-200 sm:py-3 sm:text-sm"
                 >
-                  <option value="オカン風">オカン風</option>
+                  <option value="オカン">オカン</option>
                   <option value="ツンデレ">ツンデレ</option>
-                  <option value="執事風">執事風</option>
-                  <option value="熱血教師風">熱血教師風</option>
+                  <option value="執事">執事</option>
+                  <option value="熱血教師">熱血教師</option>
                 </select>
                 <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-slate-400 text-xs">
                   ▾

@@ -20,7 +20,7 @@
 
     インフラ/デプロイ: Vercel (フロント), Render/Railway (バックエンド), GitHub Actions (CI/CD)
 
-    外部API: OpenWeatherMap API, OpenAI API (GPT-4o mini), LINE Messaging API
+    外部API: OpenWeatherMap API, Gemini API (Gemini 1.5 Flash), LINE Messaging API
 
 
 4. システム構成・処理の流れ (Architecture)
@@ -31,7 +31,7 @@
     [LINE Messaging API]
         ▲
         │ (メッセージ送信)
-    [バックエンド (Go/Python)] ──(プロンプト＋天気情報)──> [OpenAI API]
+    [バックエンド (Go/Python)] ──(プロンプト＋天気情報)──> [Gemini API]
         │
         ├─(定期実行 / Cron)
         ├─(ユーザーの設定・位置情報を取得) ──> [Supabase DB]
@@ -45,7 +45,7 @@
 
     [🍿] Phase 2: フロントエンド(Next.js)のモック作成 (設定画面のUI)
 
-    [ ] Phase 3: Supabaseのセットアップ (ログイン機能と、設定を保存するDB)
+    [🍿] Phase 3: Supabaseのセットアップ (ログイン機能と、設定を保存するDB)
 
     [ ] Phase 4: バックエンド(Go/Python)の作成 (天気・AI・LINEのAPI連携ロジック)
 
@@ -59,3 +59,5 @@
 
     7/11 位置情報保存、キャラクター切り替え、通知時間設定、ルールブック機能を追加
          つぎは、ユーザごとにデータを保存できるように
+
+    7/14 ユーザーごとの設定保存、Supabaseセットアップ、Gemini APIによるAIアドバイス生成機能を追加
