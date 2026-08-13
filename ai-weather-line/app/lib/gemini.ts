@@ -20,7 +20,7 @@ export async function generateWeatherAdvice(
 
   // GoogleGenerativeAIクライアントの初期化
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
 
   const prompt = `
 あなたは以下のキャラクターとして、ユーザーに今日の天気と気温を踏まえたお天気アドバイスを伝えてください。
