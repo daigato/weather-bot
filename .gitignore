@@ -1,0 +1,19 @@
+# 環境変数ファイル（APIキー等の機密情報）
+.env
+.env.*
+!.env.example
+
+# Python キャッシュ・仮想環境
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+
+# OS・エディタ生成ファイル
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
